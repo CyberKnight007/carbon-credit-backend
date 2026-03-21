@@ -1,0 +1,40 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const helmet_1 = __importDefault(require("helmet"));
+const morgan_1 = __importDefault(require("morgan"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const path_1 = __importDefault(require("path"));
+const config_1 = require("./config");
+const error_middleware_1 = require("./middleware/error.middleware");
+const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
+const projects_routes_1 = __importDefault(require("./modules/projects/projects.routes"));
+const trees_routes_1 = __importDefault(require("./modules/trees/trees.routes"));
+const submissions_routes_1 = __importDefault(require("./modules/submissions/submissions.routes"));
+const payments_routes_1 = __importDefault(require("./modules/payments/payments.routes"));
+const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
+const app = (0, express_1.default)();
+app.use((0, helmet_1.default)());
+app.use((0, cors_1.default)({ origin: config_1.config.frontendUrl, credentials: true }));
+app.use((0, morgan_1.default)(config_1.config.nodeEnv === "development" ? "dev" : "combined"));
+// Raw body for Stripe webhooks
+app.use("/api/payments/webhook", express_1.default.raw({ type: "application/json" }));
+app.use(express_1.default.json({ limit: "10mb" }));
+app.use(express_1.default.urlencoded({ extended: true }));
+const limiter = (0, express_rate_limit_1.default)({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use("/api", limiter);
+app.use("/api/auth", auth_routes_1.default);
+app.use("/api/projects", projects_routes_1.default);
+app.use("/api/trees", trees_routes_1.default);
+app.use("/api/submissions", submissions_routes_1.default);
+app.use("/api/payments", payments_routes_1.default);
+app.use("/api/admin", admin_routes_1.default);
+app.use("/uploads", express_1.default.static(path_1.default.join(process.cwd(), "uploads")));
+app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.use(error_middleware_1.errorHandler);
+exports.default = app;
+//# sourceMappingURL=app.js.map
