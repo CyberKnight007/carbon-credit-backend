@@ -4,6 +4,7 @@ import { authenticate, requireRole, AuthRequest } from "../../middleware/auth.mi
 import { upload, uploadToCloudinary } from "../../middleware/upload.middleware";
 import { AppError } from "../../middleware/error.middleware";
 import { verifyTreePhoto } from "../../services/ai.service";
+import { sendEmail } from "../../services/email.service";
 import axios from "axios";
 
 const router = Router();
@@ -175,7 +176,26 @@ router.patch(
           reviewedBy: req.user!.id,
           reviewedAt: new Date(),
         },
+        include: { farmer: { include: { user: true } } },
       });
+
+      const farmerEmail = (submission.farmer as any)?.user?.email;
+      if (farmerEmail) {
+        if (approved) {
+          await sendEmail(
+            farmerEmail,
+            "✅ Tree photo approved!",
+            "<p>Your photo submission was approved. Keep up the great work!</p>"
+          );
+        } else {
+          await sendEmail(
+            farmerEmail,
+            "❌ Tree photo needs review",
+            "<p>Your submission was rejected. Please submit a clear photo of your tree.</p>"
+          );
+        }
+      }
+
       res.json(submission);
     } catch (err) {
       next(err);

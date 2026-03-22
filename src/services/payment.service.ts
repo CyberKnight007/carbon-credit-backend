@@ -2,6 +2,7 @@ import { config } from "../config";
 import { prisma } from "../config/database";
 import { calculateFarmerPayout } from "../utils/carbon";
 import { generateCertificate } from "./certificate.service";
+import { sendEmail } from "./email.service";
 
 let stripe: any = null;
 
@@ -76,6 +77,8 @@ export async function processMonthlyPayouts(month: number, year: number) {
     },
   });
 
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
   for (const farmer of farmers) {
     let totalAmount = 0;
     let totalApprovedDays = 0;
@@ -108,6 +111,10 @@ export async function processMonthlyPayouts(month: number, year: number) {
       },
     });
 
+    const farmerUser = await prisma.user.findUnique({ where: { id: farmer.userId } });
+    const amountFormatted = totalAmount.toFixed(2);
+    const monthLabel = `${monthNames[month - 1]} ${year}`;
+
     const s = getStripe();
     if (s && farmer.stripeAccountId) {
       try {
@@ -134,6 +141,14 @@ export async function processMonthlyPayouts(month: number, year: number) {
         where: { id: farmer.id },
         data: { totalEarnings: { increment: totalAmount } },
       });
+    }
+
+    if (farmerUser) {
+      await sendEmail(
+        farmerUser.email,
+        `🌱 Your monthly payout is ready - $${amountFormatted}`,
+        `<p>Great news! Your payout of <strong>$${amountFormatted}</strong> for <strong>${farmer.trees.length} trees</strong> in <strong>${monthLabel}</strong> has been processed.</p>`
+      );
     }
   }
 

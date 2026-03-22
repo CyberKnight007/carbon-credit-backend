@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from "express";
 import { prisma } from "../../config/database";
 import { authenticate, requireRole, AuthRequest } from "../../middleware/auth.middleware";
 import { processMonthlyPayouts } from "../../services/payment.service";
+import { sendEmail } from "../../services/email.service";
 
 const router = Router();
 
@@ -80,11 +81,32 @@ router.patch("/users/:id/status", async (req: AuthRequest, res: Response, next: 
 router.patch("/kyc/:type/:id", async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { type, id } = req.params;
+    let userEmail: string | null = null;
+
     if (type === "farmer") {
-      await prisma.farmer.update({ where: { id }, data: { isKycVerified: true } });
+      const farmer = await prisma.farmer.update({
+        where: { id },
+        data: { isKycVerified: true },
+        include: { user: true },
+      });
+      userEmail = farmer.user.email;
     } else if (type === "organization") {
-      await prisma.organization.update({ where: { id }, data: { isKycVerified: true } });
+      const org = await prisma.organization.update({
+        where: { id },
+        data: { isKycVerified: true },
+        include: { user: true },
+      });
+      userEmail = org.user.email;
     }
+
+    if (userEmail) {
+      await sendEmail(
+        userEmail,
+        "🎉 KYC Verified - You're all set!",
+        "<p>Your account has been KYC verified. You can now receive payouts!</p>"
+      );
+    }
+
     res.json({ message: "KYC verified" });
   } catch (err) {
     next(err);

@@ -12,11 +12,28 @@ import treesRoutes from "./modules/trees/trees.routes";
 import submissionsRoutes from "./modules/submissions/submissions.routes";
 import paymentsRoutes from "./modules/payments/payments.routes";
 import adminRoutes from "./modules/admin/admin.routes";
+import usersRoutes from "./modules/users/users.routes";
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.frontendUrl, credentials: true }));
+
+const allowedOrigins = [
+  config.frontendUrl,
+  "http://localhost:3000",
+  "https://carboncredits.gladiatorrx.in",
+  "https://carboncredit.gladiatorrx.in",
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(morgan(config.nodeEnv === "development" ? "dev" : "combined"));
 
 // Raw body for Stripe webhooks
@@ -33,6 +50,8 @@ app.use("/api/trees", treesRoutes);
 app.use("/api/submissions", submissionsRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/users", usersRoutes);
+app.use("/api/auth", usersRoutes); // forgot-password and reset-password live under /api/auth
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
